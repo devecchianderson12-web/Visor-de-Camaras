@@ -56,7 +56,8 @@ class MainWindow(QWidget):
         root.addWidget(self.stage, 1)
         root.addWidget(self.toolbar)
         self._build_exit_button()
-        self.perf = PerfBadge(self)
+        self.perf = PerfBadge(self, float(self.cfg.get("perf_opacity", 0.85)),
+                              float(self.cfg.get("perf_interval", 2.0)))
         self._update_perf()
 
         self.rebuild()
@@ -194,6 +195,38 @@ class MainWindow(QWidget):
     def _update_perf(self):
         self.perf.set_active(bool(self.cfg.get("perf_monitor", True)) and not self._mini)
 
+    def _fps_zoom(self):
+        """Al maximizar una cámara nunca baja de la fluidez elegida para la cuadrícula."""
+        g = self.cfg.get("fps_grid", 12)
+        return 0 if g == 0 else max(self.cfg.get("fps_zoom", 25), g)
+
+    def set_fps(self, value):
+        """Fluidez máxima mostrada (0 = todos los fotogramas). Más fps = más CPU."""
+        self.cfg["fps_grid"] = value
+        self.save()
+        for w in self.widgets:
+            w.worker.fps = self._fps_zoom() if w is self.zoomed else value
+
+    def toggle_show_fps(self):
+        self.cfg["show_fps"] = not self.cfg.get("show_fps", False)
+        self.save()
+        for w in self.widgets:
+            w.update()
+
+    def set_perf_opacity(self, value):
+        value = max(0.1, min(1.0, round(float(value), 2)))
+        self.cfg["perf_opacity"] = value
+        self.save()
+        self.perf.set_opacity(value)
+
+    def step_perf_opacity(self, delta):
+        self.set_perf_opacity(float(self.cfg.get("perf_opacity", 0.85)) + delta)
+
+    def set_perf_interval(self, seconds):
+        self.cfg["perf_interval"] = seconds
+        self.save()
+        self.perf.set_interval(seconds)
+
     def toggle_perf(self):
         self.cfg["perf_monitor"] = not self.cfg.get("perf_monitor", True)
         self.save()
@@ -302,7 +335,7 @@ class MainWindow(QWidget):
             self._set_stretch(False)
             for o in self.widgets:
                 o.setVisible(o is w)
-            w.worker.fps = self.cfg["fps_zoom"]
+            w.worker.fps = self._fps_zoom()
             if auto:
                 w.set_quality(QUALITY_MAIN, save=False)
         else:

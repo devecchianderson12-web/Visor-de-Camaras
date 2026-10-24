@@ -229,9 +229,10 @@ def _make_backend():
 class SysMonitor:
     """Hilo que mide 1 vez por segundo mientras está activo. snapshot() -> (cpu %, ram %, gpu % | None)."""
 
-    def __init__(self):
+    def __init__(self, on_sample=None, interval=2.0):
         self.cpu, self.ram, self.gpu = 0.0, 0.0, None
         self.gpu_source = ""
+        self.on_sample, self.interval = on_sample, interval   # se pueden cambiar en caliente
         self._thread, self._stop = None, threading.Event()
 
     def start(self):
@@ -252,6 +253,8 @@ class SysMonitor:
         try:
             backend = _make_backend()
             self.gpu_source = backend.gpu_source
+            backend.cpu()                          # lectura de referencia: el primer valor ya es real
+            stop.wait(0.4)
             while not stop.is_set():
                 try:
                     c, r, g = backend.cpu(), backend.ram(), backend.gpu()
@@ -262,7 +265,12 @@ class SysMonitor:
                 if r is not None:
                     self.ram = r
                 self.gpu = g
-                stop.wait(1.0)
+                if self.on_sample:
+                    try:
+                        self.on_sample((self.cpu, self.ram, self.gpu))
+                    except Exception:
+                        pass
+                stop.wait(max(0.5, float(self.interval)))
         finally:
             if backend:
                 backend.close()

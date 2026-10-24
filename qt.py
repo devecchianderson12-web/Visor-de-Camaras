@@ -45,6 +45,7 @@ if QT_VERSION == 5:
     QEvent = _Scoped(QEvent)
     QLineEdit = _Scoped(QLineEdit)
     QDialogButtonBox = _Scoped(QDialogButtonBox)
+    QPainter = _Scoped(QPainter)
 
 
 def event_pos(e):

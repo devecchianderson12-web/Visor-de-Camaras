@@ -15,7 +15,10 @@ DEFAULTS = {
     "auto_quality_on_zoom": True, # al maximizar usa "Convencional"
     "cameras": [],
     "fit_mode": "stretch",        # stretch (sin barras) | fill (recorta) | fit (con barras)
+    "show_fps": False,            # muestra los FPS reales en la etiqueta de cada cámara
     "perf_monitor": True,         # CPU / RAM / GPU arriba al centro
+    "perf_opacity": 0.85,         # 0.1 (casi invisible) a 1.0 (opaco)
+    "perf_interval": 2.0,         # segundos entre mediciones (más = menos CPU)
     "layout_mode": "grid",        # grid | focus | pano | custom
     "layout": None,               # None = cuadrícula automática; ver layout.py
 }

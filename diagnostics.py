@@ -69,8 +69,20 @@ def _gui_check():
     for mode in ("fill", "fit", "stretch"):               # los 3 ajustes de imagen
         win.set_fit_mode(mode)
         assert not win.grab().isNull()
-    win.perf.set_active(True)                             # monitor de rendimiento
-    win.perf._tick()
+    win.set_fps(30)                                       # fluidez + FPS reales
+    win.toggle_show_fps()
+    assert not win.grab().isNull()
+    win.set_fps(12)
+    win.toggle_show_fps()
+    win.perf.set_active(True)                             # monitor: redondeado, opacidad e intervalo
+    win.perf._on_sample((12.0, 40.0, None))
+    for op in (0.3, 1.0):
+        win.set_perf_opacity(op)
+        assert not win.perf.grab().isNull()
+    win.step_perf_opacity(-0.1)
+    win.set_perf_interval(5.0)
+    win.set_perf_opacity(0.85)
+    win.set_perf_interval(2.0)
     assert not win.perf.grab().isNull()
     win.perf.set_active(False)
     assert w.build_menu().actions()                       # menú de calidad / resolución

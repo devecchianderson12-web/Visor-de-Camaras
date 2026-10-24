@@ -20,7 +20,11 @@ Visor multicámara RTSP ultraligero. **No requiere VLC ni nada instalado**: FFmp
   En pantalla completa aparece un botón **✕ Salir** arriba a la derecha solo cuando acercas el mouse.
 - Clic derecho → **Ajuste de imagen**: *Estirar* (sin barras negras, por defecto), *Llenar* (recorta los bordes)
   u *Original* (con barras).
-- **Monitor de rendimiento** (CPU / RAM / GPU) arriba al centro; se apaga desde el clic derecho.
+- Clic derecho → **Fluidez (FPS)**: 8, 12, 15, 20, 25, 30 o todos los fotogramas. Es solo un tope de lo que se
+  *muestra*: la cámara envía los fps que tenga configurados (se cambian en la app iCSee). Más fps = más CPU.
+  «Mostrar FPS reales» pone en la etiqueta `mostrados/cámara fps`.
+- **Monitor de rendimiento** (CPU / RAM / GPU) arriba al centro, con bordes redondeados. Clic derecho →
+  Monitor de rendimiento: *Mostrar*, *Opacidad* (100–20 %, o +/−10 %) y *Actualización* (1, 2 o 5 s).
   GPU: contadores de Windows 10+ (cualquier marca) o NVIDIA (NVML) en 8.1; si no, «n/d».
 - Doble clic: maximiza una cámara (pausa las demás). Doble clic o Esc: volver.
 - F11: pantalla completa (oculta la barra). Minimizar = todo en pausa.

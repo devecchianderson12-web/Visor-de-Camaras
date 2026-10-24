@@ -38,6 +38,21 @@ def fit_size(fw, fh, tw, th, max_h=0):
     return max(16, int(fw * s)), max(16, int(fh * s))
 
 
+class Pacer:
+    """Decide qué fotogramas mostrar para no superar `fps`. Sigue un calendario fijo (no «tiempo desde el
+    último»), así que el jitter de la red no recorta a la mitad una cámara que envía justo a `fps`."""
+
+    def __init__(self):
+        self.next_t = 0.0
+
+    def accept(self, now, fps):
+        interval = 1.0 / fps if fps else 0.0              # fps = 0 -> mostrar todos
+        if now < self.next_t - interval * 0.1:
+            return False
+        self.next_t = self.next_t + interval if now - self.next_t < interval else now + interval
+        return True
+
+
 def out_size(mode, fw, fh, tw, th, max_h=0):
     """Tamaño de la imagen que se entrega a la UI según el modo de ajuste."""
     if mode == "fit":
@@ -90,6 +105,7 @@ class CameraWorker(threading.Thread):
         self.use_hw = use_hw
         self.fps = fps
         self.target = (640, 360)          # tamaño del widget (px); lo actualiza la UI
+        self.src_fps = 0.0                       # fps que envía la cámara (lo informa el stream)
         self.fit_mode = "stretch"                 # lo fija la UI (stretch | fill | fit)
         self.max_h = int(cam.get("res", 0) or 0)   # tope de resolución mostrada (0 = automática)
         self.on_frame, self.on_status = on_frame, on_status
@@ -148,10 +164,15 @@ class CameraWorker(threading.Thread):
         except TypeError:                       # PyAV sin parámetro hwaccel
             container = av.open(url, options=options, timeout=(8.0, 8.0))
         got = False
-        last = 0.0
+        pacer = Pacer()
         try:
             vs = container.streams.video[0]
             vs.codec_context.thread_count = 2 if sub else 0
+            try:
+                rate = vs.average_rate or vs.guessed_rate
+                self.src_fps = float(rate) if rate else 0.0
+            except Exception:
+                self.src_fps = 0.0
             for packet in container.demux(vs):
                 if self._stop.is_set() or self._reload.is_set():
                     break
@@ -163,10 +184,8 @@ class CameraWorker(threading.Thread):
                         return False
                     continue
                 for frame in frames:
-                    now = time.monotonic()
-                    if now - last < 1.0 / max(self.fps, 1):
+                    if not pacer.accept(time.monotonic(), self.fps):
                         continue                 # descarta sin convertir = ahorra CPU
-                    last = now
                     w, h = out_size(self.fit_mode, frame.width, frame.height, *self.target, self.max_h)
                     arr = frame.to_ndarray(width=w, height=h, format="rgb24")
                     if not arr.flags["C_CONTIGUOUS"]:
