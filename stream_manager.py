@@ -28,6 +28,14 @@ def build_url(cam: dict, quality: str, template: str) -> str:
     )
 
 
+def fit_size(fw, fh, tw, th, max_h=0):
+    """Tamaño de salida: cabe en el widget, nunca amplía y respeta el tope de resolución."""
+    s = min(tw / fw, th / fh, 1.0)
+    if max_h:
+        s = min(s, max_h / fh)
+    return max(16, int(fw * s)), max(16, int(fh * s))
+
+
 def _pick_hw():
     if HWAccel is None:
         return None
@@ -51,6 +59,7 @@ class CameraWorker(threading.Thread):
         self.use_hw = use_hw
         self.fps = fps
         self.target = (640, 360)          # tamaño del widget (px); lo actualiza la UI
+        self.max_h = int(cam.get("res", 0) or 0)   # tope de resolución mostrada (0 = automática)
         self.on_frame, self.on_status = on_frame, on_status
         q = cam.get("quality", QUALITY_SUB)
         self.quality = q if q in QUALITIES else QUALITY_SUB
@@ -126,9 +135,7 @@ class CameraWorker(threading.Thread):
                     if now - last < 1.0 / max(self.fps, 1):
                         continue                 # descarta sin convertir = ahorra CPU
                     last = now
-                    tw, th = self.target
-                    s = min(tw / frame.width, th / frame.height, 1.0)
-                    w, h = max(16, int(frame.width * s)), max(16, int(frame.height * s))
+                    w, h = fit_size(frame.width, frame.height, *self.target, self.max_h)
                     arr = frame.to_ndarray(width=w, height=h, format="rgb24")
                     if not arr.flags["C_CONTIGUOUS"]:
                         arr = np.ascontiguousarray(arr)

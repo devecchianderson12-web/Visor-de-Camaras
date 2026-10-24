@@ -10,6 +10,9 @@ from PyQt6.QtWidgets import (QApplication, QDialog, QDialogButtonBox, QFormLayou
 from stream_manager import QUALITIES, QUALITY_SUB, CameraWorker
 
 
+RES_OPTIONS = ((0, "Automática"), (720, "720p"), (480, "480p"), (360, "360p"), (240, "240p"))
+
+
 class _Signals(QObject):
     frame = pyqtSignal(object)
     status = pyqtSignal(str)
@@ -53,6 +56,16 @@ class VideoWidget(QWidget):
         self.cam["quality"] = quality
         if save:
             self.app.save()
+        self.update()
+
+    def set_resolution(self, height):
+        """Tope de resolución mostrada. No reconecta: se aplica al siguiente fotograma."""
+        self.worker.max_h = height
+        if height:
+            self.cam["res"] = height
+        else:
+            self.cam.pop("res", None)
+        self.app.save()
         self.update()
 
     def shutdown(self):
@@ -129,10 +142,21 @@ class VideoWidget(QWidget):
             act.triggered.connect(lambda _=False, q=q: self.set_quality(q))
             group.addAction(act)
             menu.addAction(act)
+        res_menu = menu.addMenu("Resolución")
+        rgroup = QActionGroup(res_menu)
+        rgroup.setExclusive(True)
+        for h, label in RES_OPTIONS:
+            ract = QAction(label, res_menu)
+            ract.setCheckable(True)
+            ract.setChecked(h == self.worker.max_h)
+            ract.triggered.connect(lambda _=False, h=h: self.set_resolution(h))
+            rgroup.addAction(ract)
+            res_menu.addAction(ract)
         menu.addSeparator()
         if self.app.cfg.get("layout_mode") in ("focus", "pano"):
             menu.addAction("Hacer principal (la grande)", lambda: self.app.make_primary(self.cam))
-        menu.addAction("Pantalla completa (F11)", self.app.toggle_fullscreen)
+        menu.addAction("Salir de pantalla completa" if self.app.isFullScreen() else "Pantalla completa (F11)",
+                       self.app.toggle_fullscreen)
         menu.addAction("Personalizar cuadrícula…", self.app.customize_layout)
         menu.addAction("Administrar cámaras…", self.app.manage_cameras)
         menu.exec(e.globalPos())
@@ -152,6 +176,8 @@ class VideoWidget(QWidget):
             p.setPen(QColor(170, 170, 170))
             p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._status)
         label = f"{self.cam.get('name', 'Cámara')}  ·  {self.worker.quality}"
+        if self.worker.max_h:
+            label += f"  ·  {self.worker.max_h}p"
         tw = p.fontMetrics().horizontalAdvance(label) + 16
         p.fillRect(0, 0, tw, 20, QColor(0, 0, 0, 150))
         p.setPen(QColor(225, 225, 225))

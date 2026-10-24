@@ -1,7 +1,8 @@
-"""iCSee Lite - visor multicámara RTSP ultraligero e independiente (PyAV + PyQt6)."""
+"""The Watcher - visor multicámara RTSP ultraligero e independiente (PyAV + PyQt6)."""
 import sys
 
 from PyQt6.QtCore import QEvent, Qt, QTimer
+from PyQt6.QtGui import QCursor, QIcon
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QGridLayout, QHBoxLayout, QMessageBox,
                              QPushButton, QVBoxLayout, QWidget)
 
@@ -19,6 +20,12 @@ MODES = [
     ("custom", "Mi planilla", "Tu propia distribución. Clic: aplicar · otro clic: editarla"),
 ]
 
+EXIT_STYLE = """
+QPushButton { background: rgba(0,0,0,150); color: #e6e6e6; border: 1px solid rgba(255,255,255,60);
+              border-radius: 6px; }
+QPushButton:hover { background: rgba(31,95,191,230); color: white; }
+"""
+
 BAR_STYLE = """
 #bar { background: #101010; }
 #bar QPushButton { background: #232323; color: #ddd; border: 1px solid #3a3a3a;
@@ -31,12 +38,13 @@ BAR_STYLE = """
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("iCSee Lite")
+        self.setWindowTitle("The Watcher")
         self.setMinimumSize(480, 260)
         self.setStyleSheet("MainWindow { background: black; }")
         self.cfg = config.load()
         self.widgets, self.zoomed, self._saved_q, self._mini = [], None, None, False
         self._dims, self._unassigned = (0, 0), []
+        self._fs = False
 
         self.stage = QWidget()
         self.grid = QGridLayout(self.stage)
@@ -49,6 +57,7 @@ class MainWindow(QWidget):
         root.setSpacing(0)
         root.addWidget(self.stage, 1)
         root.addWidget(self.toolbar)
+        self._build_exit_button()
 
         self.rebuild()
         if not self.cfg["cameras"]:
@@ -79,6 +88,7 @@ class MainWindow(QWidget):
         for label, tip, fn in (
                 ("Buscar ONVIF", "Busca dispositivos ONVIF (como VMS Lite)", lambda: self.discover("onvif")),
                 ("Buscar en red", "Escanea la red IPv4 buscando cámaras", lambda: self.discover("net")),
+                ("Pantalla completa", "Pantalla completa (F11)", self.toggle_fullscreen),
                 ("Cámaras", "Agregar, editar o quitar cámaras", self.manage_cameras)):
             b = QPushButton(label)
             b.setToolTip(tip)
@@ -86,6 +96,45 @@ class MainWindow(QWidget):
             b.clicked.connect(lambda _=False, f=fn: f())
             h.addWidget(b)
         self._sync_modes()
+
+    def _build_exit_button(self):
+        """Botón discreto arriba a la derecha: solo aparece al acercar el mouse (en pantalla completa)."""
+        self.exit_btn = QPushButton("✕  Salir", self)
+        self.exit_btn.setToolTip("Salir de pantalla completa (Esc)")
+        self.exit_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.exit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.exit_btn.setStyleSheet(EXIT_STYLE)
+        self.exit_btn.setFixedSize(92, 32)
+        self.exit_btn.clicked.connect(lambda: self._set_fullscreen(False))
+        self.exit_btn.hide()
+        # consulta la posición del mouse 10 veces/s, solo mientras hay pantalla completa
+        self._edge_timer = QTimer(self)
+        self._edge_timer.setInterval(100)
+        self._edge_timer.timeout.connect(self._edge_tick)
+
+    def _edge_tick(self):
+        p = self.mapFromGlobal(QCursor.pos())
+        near = 0 <= p.y() <= 90 and self.width() - 260 <= p.x() <= self.width()
+        if near != self.exit_btn.isVisible():
+            self.exit_btn.setVisible(near)
+            if near:
+                self.exit_btn.raise_()
+
+    def _apply_fs(self, on):
+        if on == self._fs:
+            return
+        self._fs = on
+        self.toolbar.setVisible(not on)
+        self.exit_btn.hide()
+        if on:
+            self._edge_timer.start()
+        else:
+            self._edge_timer.stop()
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        if hasattr(self, "exit_btn"):
+            self.exit_btn.move(self.width() - self.exit_btn.width() - 12, 12)
 
     def _sync_modes(self):
         mode = self.cfg.get("layout_mode", "grid")
@@ -179,7 +228,7 @@ class MainWindow(QWidget):
     def customize_layout(self):
         cams = self.cfg["cameras"]
         if not cams:
-            QMessageBox.information(self, "iCSee Lite", "Primero agrega al menos una cámara.")
+            QMessageBox.information(self, "The Watcher", "Primero agrega al menos una cámara.")
             return
         lay = L.normalize(self.cfg["layout"], cams) if self.cfg.get("layout") else None
         lay = lay or L.default_editor_layout(cams)
@@ -200,7 +249,7 @@ class MainWindow(QWidget):
         self.save()
         self.rebuild()
         if self._unassigned:              # hay más cámaras que celdas libres (planilla propia)
-            QMessageBox.information(self, "iCSee Lite",
+            QMessageBox.information(self, "The Watcher",
                                     "Hay cámaras sin celda. Amplía o reorganiza tu planilla.")
             self.customize_layout()
 
@@ -220,10 +269,10 @@ class MainWindow(QWidget):
     # ---- ventana ----
     def _set_fullscreen(self, on):
         self.showFullScreen() if on else self.showNormal()
-        self.toolbar.setVisible(not on)
+        self._apply_fs(on)
 
     def toggle_fullscreen(self):
-        self._set_fullscreen(not self.isFullScreen())
+        self._set_fullscreen(not self._fs)
 
     def toggle_zoom(self, w):
         """Doble clic: maximiza una cámara y pausa las demás (0 % CPU en ellas)."""
@@ -253,9 +302,11 @@ class MainWindow(QWidget):
             w.worker.set_paused(self._mini or (self.zoomed is not None and w is not self.zoomed))
 
     def changeEvent(self, e):
-        if e.type() == QEvent.Type.WindowStateChange and self.isMinimized() != self._mini:
-            self._mini = self.isMinimized()   # minimizada = todo en pausa
-            self._apply_pause()
+        if e.type() == QEvent.Type.WindowStateChange:
+            if self.isMinimized() != self._mini:
+                self._mini = self.isMinimized()   # minimizada = todo en pausa
+                self._apply_pause()
+            self._apply_fs(self.isFullScreen())   # por si salen con Win+flechas u otro medio
         super().changeEvent(e)
 
     def keyPressEvent(self, e):
@@ -264,7 +315,7 @@ class MainWindow(QWidget):
         elif e.key() == Qt.Key.Key_Escape:
             if self.zoomed:
                 self.toggle_zoom(self.zoomed)
-            elif self.isFullScreen():
+            elif self._fs:
                 self._set_fullscreen(False)
 
     def closeEvent(self, e):
@@ -274,7 +325,15 @@ class MainWindow(QWidget):
 
 
 def main():
+    if sys.platform == "win32":                # el icono propio también en la barra de tareas
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("TheWatcher.Viewer")
+        except Exception:
+            pass
     app = QApplication(sys.argv)
+    app.setApplicationName("The Watcher")
+    app.setWindowIcon(QIcon(config.resource_path("assets/watcher.png")))
     win = MainWindow()
     win.resize(1280, 760)
     win.show()

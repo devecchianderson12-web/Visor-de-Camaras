@@ -28,6 +28,12 @@ def base_dir() -> str:
 PATH = os.path.join(base_dir(), "config.json")
 
 
+def resource_path(rel: str) -> str:
+    """Archivos incluidos en el .exe (iconos): dentro del paquete de PyInstaller o junto al código."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, rel)
+
+
 def load() -> dict:
     cfg = dict(DEFAULTS)
     try:
