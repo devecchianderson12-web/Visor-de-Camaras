@@ -1,11 +1,10 @@
 """Widgets: vídeo por cámara (clic derecho = calidad) y gestor de cámaras."""
 import uuid
 
-from PyQt6.QtCore import QByteArray, QMimeData, QObject, QRect, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QActionGroup, QColor, QDrag, QImage, QPainter, QPen, QPixmap
-from PyQt6.QtWidgets import (QApplication, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
-                             QLineEdit, QListWidget, QMenu, QPushButton, QVBoxLayout,
-                             QWidget)
+from qt import (event_pos, pyqtSignal, QAction, QActionGroup, QApplication, QByteArray, QColor,
+               QDialog, QDialogButtonBox, QDrag, qexec, QFormLayout, QHBoxLayout, QImage, QLineEdit,
+               QListWidget, QMenu, QMimeData, QObject, QPainter, QPen, QPixmap, QPushButton, QRect,
+               Qt, QVBoxLayout, QWidget)
 
 from stream_manager import QUALITIES, QUALITY_SUB, CameraWorker
 
@@ -76,7 +75,7 @@ class VideoWidget(QWidget):
     MIME = "application/x-icsee-cam"
 
     def mousePressEvent(self, e):
-        self._press = e.position().toPoint() if e.button() == Qt.MouseButton.LeftButton else None
+        self._press = event_pos(e) if e.button() == Qt.MouseButton.LeftButton else None
 
     def mouseReleaseEvent(self, e):
         self._press = None
@@ -85,7 +84,7 @@ class VideoWidget(QWidget):
         if (self._press is None or not (e.buttons() & Qt.MouseButton.LeftButton)
                 or self.app.zoomed is not None or len(self.app.widgets) < 2):
             return
-        if (e.position().toPoint() - self._press).manhattanLength() < QApplication.startDragDistance():
+        if (event_pos(e) - self._press).manhattanLength() < QApplication.startDragDistance():
             return
         self._press = None
         mime = QMimeData()
@@ -99,7 +98,7 @@ class VideoWidget(QWidget):
             pm.fill(QColor(30, 30, 30))
         drag.setPixmap(pm)
         drag.setHotSpot(pm.rect().center())
-        drag.exec(Qt.DropAction.MoveAction)
+        qexec(drag, Qt.DropAction.MoveAction)
 
     def _drag_id(self, e):
         m = e.mimeData()
@@ -132,6 +131,9 @@ class VideoWidget(QWidget):
         self.app.toggle_zoom(self)
 
     def contextMenuEvent(self, e):
+        qexec(self.build_menu(), e.globalPos())
+
+    def build_menu(self):
         menu = QMenu(self)
         group = QActionGroup(menu)
         group.setExclusive(True)
@@ -159,7 +161,7 @@ class VideoWidget(QWidget):
                        self.app.toggle_fullscreen)
         menu.addAction("Personalizar cuadrícula…", self.app.customize_layout)
         menu.addAction("Administrar cámaras…", self.app.manage_cameras)
-        menu.exec(e.globalPos())
+        return menu
 
     def paintEvent(self, ev):
         p = QPainter(self)

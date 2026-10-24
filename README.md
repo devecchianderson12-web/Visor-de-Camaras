@@ -27,3 +27,13 @@ Visor multicámara RTSP ultraligero. **No requiere VLC ni nada instalado**: FFmp
 
 ## Compilar
 Sube a GitHub: Actions genera `TheWatcher.exe` (con el icono del ojo) (Artifacts).
+
+## Windows 8.1 (6.3.9600) + instalador
+- Workflow `build-win81.yml` → genera `TheWatcher-Setup-Win81.exe` (instalador) y `TheWatcher-Win81-portable.zip`.
+- Usa PyQt5 (Qt 5.15) y PyAV 12, compatibles con Windows 8.1. **Solo 64 bits.**
+- El instalador incluye todo lo necesario (Python, Qt, FFmpeg, UCRT y runtime de C++ de Microsoft) y,
+  opcionalmente, crea la regla del Firewall para «Buscar ONVIF».
+- En Windows 8.1 la decodificación es por CPU (la aceleración por GPU requiere PyAV 14). Usa «Transmisión».
+- Menú Inicio → «Diagnóstico de The Watcher» genera un informe si algo no arranca (`--diagnose`).
+- La configuración instalada se guarda en `%APPDATA%\TheWatcher\config.json` (no se borra al desinstalar).
+  El portable (`portable.flag`) la guarda junto al .exe.

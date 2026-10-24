@@ -1,0 +1,48 @@
+{
+  "url_template": "rtsp://{ip}:{port}/user={user}&password={password}&channel={channel}&stream={stream}.sdp?real_stream",
+  "hwaccel": true,
+  "fps_grid": 12,
+  "fps_zoom": 25,
+  "auto_quality_on_zoom": true,
+  "cameras": [
+    {
+      "id": "ac8e75a2",
+      "name": "NVT 192.168.1.2",
+      "ip": "192.168.1.2",
+      "port": 554,
+      "user": "admin",
+      "password": "",
+      "channel": 1,
+      "quality": "Transmisión",
+      "url_main": "rtsp://admin:@192.168.1.2:554/user=rrty_password=Gs4vmjBw_channel=0_stream=0&onvif=0.sdp?real_stream",
+      "url_sub": "rtsp://admin:@192.168.1.2:554/user=rrty_password=Gs4vmjBw_channel=0_stream=1&onvif=0.sdp?real_stream",
+      "res": 240
+    },
+    {
+      "id": "12af64c8",
+      "name": "NVT 192.168.1.9",
+      "ip": "192.168.1.9",
+      "port": 554,
+      "user": "admin",
+      "password": "",
+      "channel": 1,
+      "quality": "Transmisión",
+      "url_main": "rtsp://admin:@192.168.1.9:554/user=nrur_password=sAKQmnv1_channel=0_stream=0&onvif=0.sdp?real_stream",
+      "url_sub": "rtsp://admin:@192.168.1.9:554/user=nrur_password=sAKQmnv1_channel=0_stream=1&onvif=0.sdp?real_stream"
+    },
+    {
+      "id": "6eb1d3fc",
+      "name": "NVT 192.168.1.12",
+      "ip": "192.168.1.12",
+      "port": 554,
+      "user": "admin",
+      "password": "",
+      "channel": 1,
+      "quality": "Transmisión",
+      "url_main": "rtsp://admin:@192.168.1.12:554/user=txah_password=GepeSzXK_channel=0_stream=0&onvif=0.sdp?real_stream",
+      "url_sub": "rtsp://admin:@192.168.1.12:554/user=txah_password=GepeSzXK_channel=0_stream=1&onvif=0.sdp?real_stream"
+    }
+  ],
+  "layout_mode": "grid",
+  "layout": null
+}

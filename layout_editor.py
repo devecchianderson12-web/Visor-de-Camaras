@@ -1,8 +1,8 @@
 """Editor visual de la cuadrícula: selecciona celdas -> Unir / Separar / asignar cámara."""
 import copy
 
-from PyQt6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QGridLayout, QHBoxLayout,
-                             QLabel, QPushButton, QSpinBox, QVBoxLayout, QWidget)
+from qt import (QComboBox, QDialog, QDialogButtonBox, QGridLayout, QHBoxLayout, QLabel, QPushButton,
+               QSpinBox, QVBoxLayout, QWidget)
 
 import layout as L
 

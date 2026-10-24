@@ -2,9 +2,9 @@
 import threading
 import uuid
 
-from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
-from PyQt6.QtWidgets import (QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                             QListWidgetItem, QMessageBox, QProgressBar, QPushButton, QVBoxLayout)
+from qt import (pyqtSignal, QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+               QListWidgetItem, QMessageBox, QObject, QProgressBar, QPushButton, Qt, QTimer,
+               QVBoxLayout)
 
 import discovery as D
 from stream_manager import QUALITY_SUB

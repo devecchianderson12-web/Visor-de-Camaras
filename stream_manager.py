@@ -10,6 +10,8 @@ try:
 except Exception:  # versión de PyAV sin soporte hwaccel
     HWAccel = None
 
+_FFERR = getattr(av.error, "FFmpegError", Exception)
+
 QUALITY_SUB = "Transmisión"    # substream: fluido, baja resolución
 QUALITY_MAIN = "Convencional"  # mainstream: alta definición
 QUALITIES = (QUALITY_SUB, QUALITY_MAIN)
@@ -125,7 +127,7 @@ class CameraWorker(threading.Thread):
                     break
                 try:
                     frames = packet.decode()
-                except av.error.FFmpegError:
+                except _FFERR:
                     if hw_name and not got:      # la GPU no pudo: reintenta en CPU
                         self.use_hw = False
                         return False

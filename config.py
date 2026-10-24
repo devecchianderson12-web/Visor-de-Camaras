@@ -25,7 +25,27 @@ def base_dir() -> str:
     return os.path.dirname(os.path.abspath(__file__))
 
 
-PATH = os.path.join(base_dir(), "config.json")
+def data_dir() -> str:
+    """Dónde se guarda config.json.
+    - Desde el código fuente, o con «portable.flag» / un config.json junto al .exe: junto al programa.
+    - Instalado (p. ej. en Program Files, que no es escribible): %APPDATA%\\TheWatcher."""
+    here = base_dir()
+    if not getattr(sys, "frozen", False):
+        return here
+    if os.path.exists(os.path.join(here, "portable.flag")) or os.path.exists(os.path.join(here, "config.json")):
+        return here
+    root = os.environ.get("APPDATA")
+    if not root:
+        return here
+    path = os.path.join(root, "TheWatcher")
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        return here
+    return path
+
+
+PATH = os.path.join(data_dir(), "config.json")
 
 
 def resource_path(rel: str) -> str:

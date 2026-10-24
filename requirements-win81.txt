@@ -1,0 +1,5 @@
+# Versiones compatibles con Windows 8.1 (Qt 5.15.2 y FFmpeg de PyAV 12). Python 3.11.
+av==12.3.0
+numpy==1.26.4
+PyQt5==5.15.11
+PyQt5-Qt5==5.15.2
