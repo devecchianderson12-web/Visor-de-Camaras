@@ -4,6 +4,7 @@
 import io
 import os
 import platform
+import time
 import sys
 import traceback
 
@@ -65,6 +66,13 @@ def _gui_check():
     win.show()
     app.processEvents()
     assert not win.grab().isNull()
+    for mode in ("fill", "fit", "stretch"):               # los 3 ajustes de imagen
+        win.set_fit_mode(mode)
+        assert not win.grab().isNull()
+    win.perf.set_active(True)                             # monitor de rendimiento
+    win.perf._tick()
+    assert not win.perf.grab().isNull()
+    win.perf.set_active(False)
     assert w.build_menu().actions()                       # menú de calidad / resolución
     for dlg in (CamerasDialog([cam]), LayoutDialog([cam], LY.default_editor_layout([cam])),
                 OnvifDialog(set()), NetScanDialog(set())):
@@ -110,6 +118,17 @@ def report(deep=False):
     except Exception as e:
         ok = False
         add("Qt", "ERROR " + repr(e))
+    try:
+        import sysmon
+        b = sysmon._make_backend()
+        b.cpu()
+        time.sleep(0.4)
+        c, r, g = b.cpu(), b.ram(), b.gpu()
+        add("Monitor", f"CPU {c:.0f}%  RAM {r:.0f}%  GPU " + (f"{g:.0f}%" if g is not None else "n/d")
+            + f"  [{b.gpu_source}]")
+        b.close()
+    except Exception as e:                                # aviso, no es fatal
+        add("Monitor", "AVISO " + repr(e))
     if deep and ok:
         try:
             add("Ventanas (GUI)", _gui_check())

@@ -9,7 +9,7 @@ import layout as L
 from discovery_dialogs import NetScanDialog, OnvifDialog
 from layout_editor import LayoutDialog
 from stream_manager import QUALITY_MAIN
-from ui import CamerasDialog, VideoWidget
+from ui import CamerasDialog, PerfBadge, VideoWidget
 
 MODES = [
     ("grid", "Cuadrícula", "Todas las cámaras en cuadrícula automática, sin huecos"),
@@ -56,6 +56,8 @@ class MainWindow(QWidget):
         root.addWidget(self.stage, 1)
         root.addWidget(self.toolbar)
         self._build_exit_button()
+        self.perf = PerfBadge(self)
+        self._update_perf()
 
         self.rebuild()
         if not self.cfg["cameras"]:
@@ -131,6 +133,8 @@ class MainWindow(QWidget):
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
+        if hasattr(self, "perf"):
+            self.perf.reposition()
         if hasattr(self, "exit_btn"):
             self.exit_btn.move(self.width() - self.exit_btn.width() - 12, 12)
 
@@ -186,6 +190,22 @@ class MainWindow(QWidget):
                 w = VideoWidget(by_id[cell["cam"]], self)
                 self.grid.addWidget(w, cell["r"], cell["c"], cell["rs"], cell["cs"])
                 self.widgets.append(w)
+
+    def _update_perf(self):
+        self.perf.set_active(bool(self.cfg.get("perf_monitor", True)) and not self._mini)
+
+    def toggle_perf(self):
+        self.cfg["perf_monitor"] = not self.cfg.get("perf_monitor", True)
+        self.save()
+        self._update_perf()
+
+    def set_fit_mode(self, mode):
+        """Estirar / llenar / original: se aplica a todas las cámaras al instante."""
+        self.cfg["fit_mode"] = mode
+        self.save()
+        for w in self.widgets:
+            w.worker.fit_mode = mode
+            w.update()
 
     def make_primary(self, cam):
         cams = self.cfg["cameras"]
@@ -304,6 +324,7 @@ class MainWindow(QWidget):
             if self.isMinimized() != self._mini:
                 self._mini = self.isMinimized()   # minimizada = todo en pausa
                 self._apply_pause()
+                self._update_perf()
             self._apply_fs(self.isFullScreen())   # por si salen con Win+flechas u otro medio
         super().changeEvent(e)
 

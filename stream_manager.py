@@ -38,6 +38,35 @@ def fit_size(fw, fh, tw, th, max_h=0):
     return max(16, int(fw * s)), max(16, int(fh * s))
 
 
+def out_size(mode, fw, fh, tw, th, max_h=0):
+    """Tamaño de la imagen que se entrega a la UI según el modo de ajuste."""
+    if mode == "fit":
+        return fit_size(fw, fh, tw, th, max_h)
+    if mode == "fill":                                   # cubre todo el recuadro (se recortará al dibujar)
+        s = min(max(tw / fw, th / fh), 1.0)
+        w, h = fw * s, fh * s
+    else:                                                # stretch: exactamente el recuadro (sin barras)
+        w, h = min(tw, fw), min(th, fh)
+    if max_h and h > max_h:
+        k = max_h / h
+        w, h = w * k, h * k
+    return max(16, int(w)), max(16, int(h))
+
+
+def cover_crop(iw, ih, W, H):
+    """Región (x, y, ancho, alto) de la imagen que llena un recuadro WxH sin deformar."""
+    s = max(W / iw, H / ih)
+    sw, sh = min(iw, W / s), min(ih, H / s)
+    return int((iw - sw) / 2), int((ih - sh) / 2), int(sw), int(sh)
+
+
+def fit_rect(iw, ih, W, H):
+    """Rectángulo (x, y, ancho, alto) centrado que conserva la proporción (con barras)."""
+    s = min(W / iw, H / ih)
+    w, h = int(iw * s), int(ih * s)
+    return (W - w) // 2, (H - h) // 2, w, h
+
+
 def _pick_hw():
     if HWAccel is None:
         return None
@@ -61,6 +90,7 @@ class CameraWorker(threading.Thread):
         self.use_hw = use_hw
         self.fps = fps
         self.target = (640, 360)          # tamaño del widget (px); lo actualiza la UI
+        self.fit_mode = "stretch"                 # lo fija la UI (stretch | fill | fit)
         self.max_h = int(cam.get("res", 0) or 0)   # tope de resolución mostrada (0 = automática)
         self.on_frame, self.on_status = on_frame, on_status
         q = cam.get("quality", QUALITY_SUB)
@@ -137,7 +167,7 @@ class CameraWorker(threading.Thread):
                     if now - last < 1.0 / max(self.fps, 1):
                         continue                 # descarta sin convertir = ahorra CPU
                     last = now
-                    w, h = fit_size(frame.width, frame.height, *self.target, self.max_h)
+                    w, h = out_size(self.fit_mode, frame.width, frame.height, *self.target, self.max_h)
                     arr = frame.to_ndarray(width=w, height=h, format="rgb24")
                     if not arr.flags["C_CONTIGUOUS"]:
                         arr = np.ascontiguousarray(arr)

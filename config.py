@@ -14,6 +14,8 @@ DEFAULTS = {
     "fps_zoom": 25,               # FPS al maximizar una cámara
     "auto_quality_on_zoom": True, # al maximizar usa "Convencional"
     "cameras": [],
+    "fit_mode": "stretch",        # stretch (sin barras) | fill (recorta) | fit (con barras)
+    "perf_monitor": True,         # CPU / RAM / GPU arriba al centro
     "layout_mode": "grid",        # grid | focus | pano | custom
     "layout": None,               # None = cuadrícula automática; ver layout.py
 }

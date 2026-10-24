@@ -18,6 +18,10 @@ Visor multicámara RTSP ultraligero. **No requiere VLC ni nada instalado**: FFmp
   conversión y dibujo = menos CPU). Para ahorrar de verdad en la decodificación usa «Transmisión».
 - Clic derecho → **Pantalla completa**, o botón «Pantalla completa» de la barra, o F11.
   En pantalla completa aparece un botón **✕ Salir** arriba a la derecha solo cuando acercas el mouse.
+- Clic derecho → **Ajuste de imagen**: *Estirar* (sin barras negras, por defecto), *Llenar* (recorta los bordes)
+  u *Original* (con barras).
+- **Monitor de rendimiento** (CPU / RAM / GPU) arriba al centro; se apaga desde el clic derecho.
+  GPU: contadores de Windows 10+ (cualquier marca) o NVIDIA (NVML) en 8.1; si no, «n/d».
 - Doble clic: maximiza una cámara (pausa las demás). Doble clic o Esc: volver.
 - F11: pantalla completa (oculta la barra). Minimizar = todo en pausa.
 

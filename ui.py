@@ -4,11 +4,14 @@ import uuid
 from qt import (event_pos, pyqtSignal, QAction, QActionGroup, QApplication, QByteArray, QColor,
                QDialog, QDialogButtonBox, QDrag, qexec, QFormLayout, QHBoxLayout, QImage, QLineEdit,
                QListWidget, QMenu, QMimeData, QObject, QPainter, QPen, QPixmap, QPushButton, QRect,
-               Qt, QVBoxLayout, QWidget)
+               Qt, QTimer, QVBoxLayout, QWidget)
 
-from stream_manager import QUALITIES, QUALITY_SUB, CameraWorker
+from stream_manager import QUALITIES, QUALITY_SUB, CameraWorker, cover_crop, fit_rect
+from sysmon import SysMonitor
 
 
+FIT_OPTIONS = (("stretch", "Estirar (sin barras negras)"), ("fill", "Llenar (recorta los bordes)"),
+               ("fit", "Original (con barras negras)"))
 RES_OPTIONS = ((0, "Automática"), (720, "720p"), (480, "480p"), (360, "360p"), (240, "240p"))
 
 
@@ -35,6 +38,7 @@ class VideoWidget(QWidget):
         cfg = app.cfg
         self.worker = CameraWorker(cam, cfg["url_template"], cfg["hwaccel"], cfg["fps_grid"],
                                    self._sig.frame.emit, self._sig.status.emit)
+        self.worker.fit_mode = cfg.get("fit_mode", "stretch")
         self.worker.start()
 
     # ---- señales (hilo de la UI) ----
@@ -154,6 +158,20 @@ class VideoWidget(QWidget):
             ract.triggered.connect(lambda _=False, h=h: self.set_resolution(h))
             rgroup.addAction(ract)
             res_menu.addAction(ract)
+        fit_menu = menu.addMenu("Ajuste de imagen")
+        fgroup = QActionGroup(fit_menu)
+        fgroup.setExclusive(True)
+        for mode, label in FIT_OPTIONS:
+            fact = QAction(label, fit_menu)
+            fact.setCheckable(True)
+            fact.setChecked(mode == self.app.cfg.get("fit_mode", "stretch"))
+            fact.triggered.connect(lambda _=False, m=mode: self.app.set_fit_mode(m))
+            fgroup.addAction(fact)
+            fit_menu.addAction(fact)
+        perf = menu.addAction("Monitor de rendimiento")
+        perf.setCheckable(True)
+        perf.setChecked(bool(self.app.cfg.get("perf_monitor", True)))
+        perf.triggered.connect(lambda _=False: self.app.toggle_perf())
         menu.addSeparator()
         if self.app.cfg.get("layout_mode") in ("focus", "pano"):
             menu.addAction("Hacer principal (la grande)", lambda: self.app.make_primary(self.cam))
@@ -167,10 +185,14 @@ class VideoWidget(QWidget):
         p = QPainter(self)
         p.fillRect(self.rect(), Qt.GlobalColor.black)
         if self._img is not None:
-            iw, ih = self._img.width(), self._img.height()
-            s = min(self.width() / iw, self.height() / ih)
-            w, h = int(iw * s), int(ih * s)
-            p.drawImage(QRect((self.width() - w) // 2, (self.height() - h) // 2, w, h), self._img)
+            iw, ih, W, H = self._img.width(), self._img.height(), self.width(), self.height()
+            mode = self.app.cfg.get("fit_mode", "stretch")
+            if mode == "fit":                                  # proporción original, con barras
+                p.drawImage(QRect(*fit_rect(iw, ih, W, H)), self._img)
+            elif mode == "fill":                               # llena el recuadro recortando los bordes
+                p.drawImage(QRect(0, 0, W, H), self._img, QRect(*cover_crop(iw, ih, W, H)))
+            else:                                              # estirar: sin barras negras
+                p.drawImage(QRect(0, 0, W, H), self._img)
         f = p.font()
         f.setPointSize(9)
         p.setFont(f)
@@ -187,6 +209,64 @@ class VideoWidget(QWidget):
         if self._drop:                            # resalta el destino mientras arrastras
             p.setPen(QPen(QColor(110, 170, 255), 4))
             p.drawRect(self.rect().adjusted(2, 2, -2, -2))
+
+
+class PerfBadge(QWidget):
+    """Pastilla discreta arriba al centro con CPU / RAM / GPU del sistema (1 muestra por segundo)."""
+    LABELS = ("CPU", "RAM", "GPU")
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)   # no estorba los clics
+        f = self.font()
+        f.setPointSize(9)
+        f.setBold(True)
+        self.setFont(f)
+        self.mon = SysMonitor()
+        self._vals = (0.0, 0.0, None)
+        self._cell = self.fontMetrics().horizontalAdvance("CPU 100%") + 14
+        self.setFixedSize(self._cell * 3 + 12, 22)
+        self._timer = QTimer(self)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._tick)
+        self.hide()
+
+    def set_active(self, on):
+        """Activo = visible y midiendo. Inactivo = oculto y sin hilo (coste cero)."""
+        if on:
+            self.mon.start()
+            self._timer.start()
+            self._tick()
+            self.show()
+            self.raise_()
+        else:
+            self._timer.stop()
+            self.mon.stop()
+            self.hide()
+
+    def reposition(self):
+        p = self.parentWidget()
+        if p is not None:
+            self.move((p.width() - self.width()) // 2, 6)
+
+    def _tick(self):
+        self._vals = self.mon.snapshot()
+        self.reposition()
+        self.update()
+
+    def paintEvent(self, ev):
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor(0, 0, 0, 150))
+        p.setFont(self.font())
+        for i, (label, v) in enumerate(zip(self.LABELS, self._vals)):
+            if v is None:
+                color, text = QColor(150, 150, 150), f"{label} n/d"
+            else:
+                color = QColor(120, 220, 140) if v < 60 else QColor(255, 200, 80) if v < 85 else QColor(255, 100, 100)
+                text = f"{label} {v:.0f}%"
+            p.setPen(color)
+            p.drawText(QRect(6 + i * self._cell, 0, self._cell, self.height()),
+                       Qt.AlignmentFlag.AlignCenter, text)
 
 
 class CamerasDialog(QDialog):
