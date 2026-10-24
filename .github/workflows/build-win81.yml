@@ -1,1 +1,96 @@
+name: Build The Watcher (Windows 8.1 + instalador)
 
+on: [push, workflow_dispatch]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias (PyQt5 + PyAV 12, compatibles con Windows 8.1)
+        shell: pwsh
+        run: python -m pip install -r requirements-win81.txt pyinstaller==6.10.0
+
+      - name: Compilar (carpeta con todo incluido)
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onedir --windowed --name TheWatcher `
+            --icon assets/watcher.ico `
+            --add-data "assets;assets" `
+            --collect-all av `
+            --exclude-module tkinter `
+            --exclude-module PyQt5.QtWebEngineCore --exclude-module PyQt5.QtWebEngineWidgets `
+            --exclude-module PyQt5.QtQml --exclude-module PyQt5.QtQuick `
+            --exclude-module PyQt5.QtSql --exclude-module PyQt5.QtMultimedia `
+            main.py
+
+      - name: Incluir runtimes de Microsoft dentro de la app (UCRT + VC++)
+        shell: pwsh
+        run: |
+          $dist = "dist\TheWatcher"
+          $targets = @($dist)
+          if (Test-Path "$dist\_internal") { $targets += "$dist\_internal" }
+          $ucrt = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\Redist" -Recurse -Filter ucrtbase.dll -ErrorAction SilentlyContinue |
+                  Where-Object { $_.FullName -match '\\ucrt\\DLLs\\x64\\' } | Select-Object -First 1
+          if (-not $ucrt) { throw "No se encontró el UCRT redistribuible del SDK de Windows" }
+          Write-Host "UCRT desde: $($ucrt.DirectoryName)"
+          foreach ($t in $targets) { Copy-Item "$($ucrt.DirectoryName)\*.dll" $t -Force }
+          $sys = "$env:SystemRoot\System32"
+          foreach ($n in "vcruntime140.dll","vcruntime140_1.dll","msvcp140.dll","msvcp140_1.dll","msvcp140_2.dll","concrt140.dll") {
+            if (Test-Path "$sys\$n") {
+              foreach ($t in $targets) { if (-not (Test-Path "$t\$n")) { Copy-Item "$sys\$n" $t } }
+            }
+          }
+
+      - name: Autodiagnóstico del programa compilado
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\TheWatcher\TheWatcher.exe" -ArgumentList @("--selftest", "$PWD\selftest.txt") -PassThru
+          if (-not $p.WaitForExit(180000)) { $p.Kill(); throw "selftest: tiempo agotado" }
+          if (Test-Path selftest.txt) { Get-Content selftest.txt } else { Write-Host "(sin informe)" }
+          if ($p.ExitCode -ne 0) { throw "El autodiagnóstico falló (código $($p.ExitCode))" }
+
+      - name: Revisar APIs que no existen en Windows 8.1 (informativo)
+        continue-on-error: true
+        shell: pwsh
+        run: python tools/scan_win81.py dist/TheWatcher
+
+      - name: Crear instalador (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = (Get-ChildItem "$env:ProgramFiles*" -Recurse -Filter ISCC.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName }
+          & $iscc "/DMyAppVersion=1.1.${{ github.run_number }}" installer\TheWatcher.iss
+          if ($LASTEXITCODE -ne 0) { throw "Falló la creación del instalador" }
+
+      - name: Paquete portable (sin instalar)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory portable | Out-Null
+          Copy-Item dist\TheWatcher portable\TheWatcher -Recurse
+          New-Item portable\TheWatcher\portable.flag -ItemType File | Out-Null
+          Compress-Archive -Path portable\TheWatcher -DestinationPath TheWatcher-Win81-portable.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TheWatcher-Win81
+          path: |
+            installer_out/TheWatcher-Setup-Win81.exe
+            TheWatcher-Win81-portable.zip
+
+      - name: Publicar release (solo con tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installer_out/TheWatcher-Setup-Win81.exe
+            TheWatcher-Win81-portable.zip
