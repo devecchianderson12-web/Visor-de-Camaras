@@ -148,6 +148,34 @@ class MainWindow(QWidget):
             self.save()
             self.rebuild()
 
+    def swap_cameras(self, id_a, id_b):
+        """Intercambia dos cámaras de lugar moviendo sus widgets: los streams no se tocan."""
+        if id_a == id_b or self.zoomed is not None:
+            return
+        wa = next((w for w in self.widgets if w.cam["id"] == id_a), None)
+        wb = next((w for w in self.widgets if w.cam["id"] == id_b), None)
+        if not (wa and wb):
+            return
+        pa = self.grid.getItemPosition(self.grid.indexOf(wa))   # (fila, col, filas, cols)
+        pb = self.grid.getItemPosition(self.grid.indexOf(wb))
+        self.grid.removeWidget(wa)
+        self.grid.removeWidget(wb)
+        self.grid.addWidget(wa, *pb)
+        self.grid.addWidget(wb, *pa)
+        cams = self.cfg["cameras"]
+        lay = None
+        if self.cfg.get("layout_mode") == "custom" and self.cfg.get("layout"):
+            lay = L.normalize(self.cfg["layout"], cams)
+        if lay:                                  # planilla propia: se intercambian las celdas
+            L.fill_unassigned(lay, cams)
+            if L.swap_cams(lay, id_a, id_b):
+                self.cfg["layout"] = lay
+        else:                                    # vistas automáticas: el orden de la lista manda
+            ia = next(i for i, c in enumerate(cams) if c["id"] == id_a)
+            ib = next(i for i, c in enumerate(cams) if c["id"] == id_b)
+            cams[ia], cams[ib] = cams[ib], cams[ia]
+        self.save()
+
     def customize_layout(self):
         cams = self.cfg["cameras"]
         if not cams:

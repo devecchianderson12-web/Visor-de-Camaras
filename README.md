@@ -13,6 +13,7 @@ Visor multicámara RTSP ultraligero. **No requiere VLC ni nada instalado**: FFmp
 
 ## Controles
 - Clic derecho en una cámara: *Transmisión* / *Convencional*.
+- **Arrastra una cámara sobre otra** para intercambiarlas de lugar (se guarda; no reconecta ni gasta CPU extra).
 - Doble clic: maximiza una cámara (pausa las demás). Doble clic o Esc: volver.
 - F11: pantalla completa (oculta la barra). Minimizar = todo en pausa.
 

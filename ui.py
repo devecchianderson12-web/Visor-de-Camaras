@@ -1,9 +1,9 @@
 """Widgets: vídeo por cámara (clic derecho = calidad) y gestor de cámaras."""
 import uuid
 
-from PyQt6.QtCore import QObject, QRect, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QActionGroup, QColor, QImage, QPainter
-from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
+from PyQt6.QtCore import QByteArray, QMimeData, QObject, QRect, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QActionGroup, QColor, QDrag, QImage, QPainter, QPen, QPixmap
+from PyQt6.QtWidgets import (QApplication, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout,
                              QLineEdit, QListWidget, QMenu, QPushButton, QVBoxLayout,
                              QWidget)
 
@@ -20,6 +20,9 @@ class VideoWidget(QWidget):
         super().__init__()
         self.cam, self.app = cam, app
         self.setMinimumSize(160, 90)
+        self.setAcceptDrops(True)
+        self._press = None
+        self._drop = False
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
         self._img = None
         self._arr = None
@@ -56,6 +59,58 @@ class VideoWidget(QWidget):
         self.worker.stop()
 
     # ---- eventos ----
+    # ---- arrastrar y soltar: intercambiar posición (sin recargar streams) ----
+    MIME = "application/x-icsee-cam"
+
+    def mousePressEvent(self, e):
+        self._press = e.position().toPoint() if e.button() == Qt.MouseButton.LeftButton else None
+
+    def mouseReleaseEvent(self, e):
+        self._press = None
+
+    def mouseMoveEvent(self, e):
+        if (self._press is None or not (e.buttons() & Qt.MouseButton.LeftButton)
+                or self.app.zoomed is not None or len(self.app.widgets) < 2):
+            return
+        if (e.position().toPoint() - self._press).manhattanLength() < QApplication.startDragDistance():
+            return
+        self._press = None
+        mime = QMimeData()
+        mime.setData(self.MIME, QByteArray(str(self.cam["id"]).encode()))
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        if self._img is not None:                 # miniatura de un solo fotograma
+            pm = QPixmap.fromImage(self._img).scaledToWidth(180)
+        else:
+            pm = QPixmap(180, 100)
+            pm.fill(QColor(30, 30, 30))
+        drag.setPixmap(pm)
+        drag.setHotSpot(pm.rect().center())
+        drag.exec(Qt.DropAction.MoveAction)
+
+    def _drag_id(self, e):
+        m = e.mimeData()
+        return bytes(m.data(self.MIME)).decode() if m.hasFormat(self.MIME) else None
+
+    def dragEnterEvent(self, e):
+        src = self._drag_id(e)
+        if src and src != self.cam["id"]:
+            self._drop = True
+            self.update()
+            e.acceptProposedAction()
+
+    def dragLeaveEvent(self, e):
+        self._drop = False
+        self.update()
+
+    def dropEvent(self, e):
+        src = self._drag_id(e)
+        self._drop = False
+        self.update()
+        if src and src != self.cam["id"]:
+            e.acceptProposedAction()
+            self.app.swap_cameras(src, self.cam["id"])
+
     def resizeEvent(self, e):
         dpr = self.devicePixelRatioF()
         self.worker.target = (max(16, int(self.width() * dpr)), max(16, int(self.height() * dpr)))
@@ -101,6 +156,9 @@ class VideoWidget(QWidget):
         p.fillRect(0, 0, tw, 20, QColor(0, 0, 0, 150))
         p.setPen(QColor(225, 225, 225))
         p.drawText(8, 14, label)
+        if self._drop:                            # resalta el destino mientras arrastras
+            p.setPen(QPen(QColor(110, 170, 255), 4))
+            p.drawRect(self.rect().adjusted(2, 2, -2, -2))
 
 
 class CamerasDialog(QDialog):

@@ -165,3 +165,13 @@ def split(layout, idxs):
         else:
             cells.append(c)
     return dict(layout, cells=_sort(cells))
+
+
+def swap_cams(layout, a, b):
+    """Intercambia las cámaras a y b entre sus celdas (planilla propia)."""
+    ca = next((c for c in layout["cells"] if c["cam"] == a), None)
+    cb = next((c for c in layout["cells"] if c["cam"] == b), None)
+    if not ca or not cb:
+        return False
+    ca["cam"], cb["cam"] = b, a
+    return True
