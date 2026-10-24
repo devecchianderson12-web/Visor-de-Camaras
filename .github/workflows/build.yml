@@ -1,10 +1,6 @@
 name: Build Windows EXE
 
-on:
-  push:
-    branches: [main, master]
-    tags: ["v*"]
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 permissions:
   contents: write
@@ -24,7 +20,7 @@ jobs:
         shell: pwsh
         run: python -m pip install -r requirements.txt pyinstaller
 
-      - name: Compilar .exe único (FFmpeg y Qt incluidos)
+      - name: Compilar exe
         shell: pwsh
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name ICSeeLite `
