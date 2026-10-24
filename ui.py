@@ -75,6 +75,8 @@ class VideoWidget(QWidget):
             group.addAction(act)
             menu.addAction(act)
         menu.addSeparator()
+        if self.app.cfg.get("layout_mode") in ("focus", "pano"):
+            menu.addAction("Hacer principal (la grande)", lambda: self.app.make_primary(self.cam))
         menu.addAction("Pantalla completa (F11)", self.app.toggle_fullscreen)
         menu.addAction("Personalizar cuadrícula…", self.app.customize_layout)
         menu.addAction("Administrar cámaras…", self.app.manage_cameras)

@@ -14,6 +14,7 @@ DEFAULTS = {
     "fps_zoom": 25,               # FPS al maximizar una cámara
     "auto_quality_on_zoom": True, # al maximizar usa "Convencional"
     "cameras": [],
+    "layout_mode": "grid",        # grid | focus | pano | custom
     "layout": None,               # None = cuadrícula automática; ver layout.py
 }
 
@@ -31,7 +32,10 @@ def load() -> dict:
     cfg = dict(DEFAULTS)
     try:
         with open(PATH, "r", encoding="utf-8") as f:
-            cfg.update(json.load(f))
+            raw = json.load(f)
+        cfg.update(raw)
+        if "layout_mode" not in raw:      # configs antiguas
+            cfg["layout_mode"] = "custom" if raw.get("layout") else "grid"
     except (OSError, ValueError):
         pass
     new_ids = False

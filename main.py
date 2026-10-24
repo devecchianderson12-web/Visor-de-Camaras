@@ -2,31 +2,106 @@
 import sys
 
 from PyQt6.QtCore import QEvent, Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QGridLayout, QMessageBox, QWidget
+from PyQt6.QtWidgets import (QApplication, QButtonGroup, QGridLayout, QHBoxLayout, QMessageBox,
+                             QPushButton, QVBoxLayout, QWidget)
 
 import config
 import layout as L
+from discovery_dialogs import NetScanDialog, OnvifDialog
 from layout_editor import LayoutDialog
 from stream_manager import QUALITY_MAIN
 from ui import CamerasDialog, VideoWidget
+
+MODES = [
+    ("grid", "Cuadrícula", "Todas las cámaras en cuadrícula automática, sin huecos"),
+    ("focus", "Destacada", "Una cámara grande y las demás a un costado"),
+    ("pano", "Panorámica", "Una cámara grande arriba y las demás en fila debajo"),
+    ("custom", "Mi planilla", "Tu propia distribución. Clic: aplicar · otro clic: editarla"),
+]
+
+BAR_STYLE = """
+#bar { background: #101010; }
+#bar QPushButton { background: #232323; color: #ddd; border: 1px solid #3a3a3a;
+                   border-radius: 4px; padding: 5px 12px; }
+#bar QPushButton:hover { background: #2f2f2f; }
+#bar QPushButton:checked { background: #1f5fbf; border-color: #6aa8ff; color: white; }
+"""
 
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("iCSee Lite")
-        self.setMinimumSize(320, 180)
+        self.setMinimumSize(480, 260)
         self.setStyleSheet("MainWindow { background: black; }")
         self.cfg = config.load()
-        self.grid = QGridLayout(self)
-        self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setSpacing(2)
         self.widgets, self.zoomed, self._saved_q, self._mini = [], None, None, False
         self._dims, self._unassigned = (0, 0), []
+
+        self.stage = QWidget()
+        self.grid = QGridLayout(self.stage)
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        self.grid.setSpacing(2)
+        self._build_toolbar()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        root.addWidget(self.stage, 1)
+        root.addWidget(self.toolbar)
+
         self.rebuild()
         if not self.cfg["cameras"]:
             QTimer.singleShot(300, self.manage_cameras)
 
+    # ---- barra inferior ----
+    def _build_toolbar(self):
+        self.toolbar = QWidget()
+        self.toolbar.setObjectName("bar")
+        self.toolbar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.toolbar.setStyleSheet(BAR_STYLE)
+        h = QHBoxLayout(self.toolbar)
+        h.setContentsMargins(8, 5, 8, 5)
+        h.setSpacing(6)
+        group = QButtonGroup(self)
+        group.setExclusive(True)
+        self.mode_btns = {}
+        for mode, label, tip in MODES:
+            b = QPushButton(label)
+            b.setCheckable(True)
+            b.setToolTip(tip)
+            b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            b.clicked.connect(lambda _=False, m=mode: self._on_mode_click(m))
+            group.addButton(b)
+            h.addWidget(b)
+            self.mode_btns[mode] = b
+        h.addStretch(1)
+        for label, tip, fn in (
+                ("Buscar ONVIF", "Busca dispositivos ONVIF (como VMS Lite)", lambda: self.discover("onvif")),
+                ("Buscar en red", "Escanea la red IPv4 buscando cámaras", lambda: self.discover("net")),
+                ("Cámaras", "Agregar, editar o quitar cámaras", self.manage_cameras)):
+            b = QPushButton(label)
+            b.setToolTip(tip)
+            b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            b.clicked.connect(lambda _=False, f=fn: f())
+            h.addWidget(b)
+        self._sync_modes()
+
+    def _sync_modes(self):
+        mode = self.cfg.get("layout_mode", "grid")
+        for m, b in self.mode_btns.items():
+            b.setChecked(m == mode)
+
+    def _on_mode_click(self, mode):
+        if mode == "custom" and (self.cfg.get("layout_mode") == "custom" or not self.cfg.get("layout")):
+            self.customize_layout()           # sin planilla guardada, o 2.º clic: editar
+            return
+        self.cfg["layout_mode"] = mode
+        self.save()
+        self.rebuild()
+        self._sync_modes()
+
+    # ---- config ----
     def save(self):
         try:
             config.save(self.cfg)
@@ -48,20 +123,30 @@ class MainWindow(QWidget):
             w.deleteLater()
         self.widgets = []
         cams = self.cfg["cameras"]
-        lay = L.normalize(self.cfg["layout"], cams) if self.cfg.get("layout") else None
-        self._unassigned = []
-        if lay:
-            self._unassigned = L.fill_unassigned(lay, cams)
-        else:
-            lay = L.auto_layout(cams)
+        mode = self.cfg.get("layout_mode", "grid")
+        lay, self._unassigned = None, []
+        if mode == "custom" and self.cfg.get("layout"):
+            lay = L.normalize(self.cfg["layout"], cams)
+            if lay:
+                self._unassigned = L.fill_unassigned(lay, cams)
+        if lay is None:
+            lay = L.preset(mode, cams)
         self._dims = (lay["rows"], lay["cols"])
-        self._set_stretch(True)       # las celdas vacías conservan su espacio
+        self._set_stretch(True)
         by_id = {c["id"]: c for c in cams}
         for cell in lay["cells"]:
             if cell["cam"]:
                 w = VideoWidget(by_id[cell["cam"]], self)
                 self.grid.addWidget(w, cell["r"], cell["c"], cell["rs"], cell["cs"])
                 self.widgets.append(w)
+
+    def make_primary(self, cam):
+        cams = self.cfg["cameras"]
+        if cam in cams:
+            cams.remove(cam)
+            cams.insert(0, cam)
+            self.save()
+            self.rebuild()
 
     def customize_layout(self):
         cams = self.cfg["cameras"]
@@ -73,23 +158,44 @@ class MainWindow(QWidget):
         L.fill_unassigned(lay, cams)
         dlg = LayoutDialog(cams, lay, self)
         if dlg.exec():
-            self.cfg["layout"] = None if dlg.auto else dlg.result_layout()
+            if dlg.auto:
+                self.cfg["layout_mode"] = "grid"
+            else:
+                self.cfg["layout"] = dlg.result_layout()
+                self.cfg["layout_mode"] = "custom"
             self.save()
             self.rebuild()
+        self._sync_modes()
+
+    # ---- cámaras ----
+    def _cameras_changed(self):
+        self.save()
+        self.rebuild()
+        if self._unassigned:              # hay más cámaras que celdas libres (planilla propia)
+            QMessageBox.information(self, "iCSee Lite",
+                                    "Hay cámaras sin celda. Amplía o reorganiza tu planilla.")
+            self.customize_layout()
 
     def manage_cameras(self):
         dlg = CamerasDialog(self.cfg["cameras"], self)
         if dlg.exec():
             self.cfg["cameras"] = dlg.result_cams()
-            self.save()
-            self.rebuild()
-            if self._unassigned:      # hay más cámaras que celdas libres
-                QMessageBox.information(self, "iCSee Lite",
-                                        "Hay cámaras sin celda. Amplía o reorganiza la cuadrícula.")
-                self.customize_layout()
+            self._cameras_changed()
+
+    def discover(self, kind):
+        existing = {c.get("ip") for c in self.cfg["cameras"]}
+        dlg = OnvifDialog(existing, self) if kind == "onvif" else NetScanDialog(existing, self)
+        if dlg.exec() and dlg.cams:
+            self.cfg["cameras"] = self.cfg["cameras"] + dlg.cams
+            self._cameras_changed()
+
+    # ---- ventana ----
+    def _set_fullscreen(self, on):
+        self.showFullScreen() if on else self.showNormal()
+        self.toolbar.setVisible(not on)
 
     def toggle_fullscreen(self):
-        self.showNormal() if self.isFullScreen() else self.showFullScreen()
+        self._set_fullscreen(not self.isFullScreen())
 
     def toggle_zoom(self, w):
         """Doble clic: maximiza una cámara y pausa las demás (0 % CPU en ellas)."""
@@ -131,7 +237,7 @@ class MainWindow(QWidget):
             if self.zoomed:
                 self.toggle_zoom(self.zoomed)
             elif self.isFullScreen():
-                self.showNormal()
+                self._set_fullscreen(False)
 
     def closeEvent(self, e):
         for w in self.widgets:
@@ -142,7 +248,7 @@ class MainWindow(QWidget):
 def main():
     app = QApplication(sys.argv)
     win = MainWindow()
-    win.resize(1280, 720)
+    win.resize(1280, 760)
     win.show()
     sys.exit(app.exec())
 

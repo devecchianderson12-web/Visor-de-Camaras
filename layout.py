@@ -26,8 +26,58 @@ def auto_dims(n):
 
 
 def auto_layout(cams):
-    rows, cols = auto_dims(len(cams))
-    return blank_layout(rows, cols, cams)
+    """Cuadrícula automática SIN huecos: la última cámara ocupa las celdas sobrantes."""
+    n = len(cams)
+    rows, cols = auto_dims(n)
+    cells = []
+    for i in range(n):
+        r, c = divmod(i, cols)
+        cells.append({"r": r, "c": c, "rs": 1, "cs": 1, "cam": cams[i]["id"]})
+    if n:
+        last = n - (rows - 1) * cols
+        if last < cols:
+            cells[-1]["cs"] += cols - last
+    return normalize({"rows": rows, "cols": cols, "cells": cells}, cams)
+
+
+def focus_layout(cams):
+    """Una cámara grande a la izquierda y las demás apiladas a la derecha."""
+    n = len(cams)
+    if n <= 1:
+        return auto_layout(cams)
+    m = n - 1
+    sc = min(math.ceil(m / 4), 2)         # columnas de cámaras pequeñas
+    k = math.ceil(m / sc)                 # filas
+    cs = 2 * sc
+    cells = [{"r": 0, "c": 0, "rs": k, "cs": cs, "cam": cams[0]["id"]}]
+    for j in range(m):
+        cells.append({"r": j % k, "c": cs + j // k, "rs": 1, "cs": 1, "cam": cams[j + 1]["id"]})
+    return normalize({"rows": k, "cols": cs + sc, "cells": cells}, cams)
+
+
+def pano_layout(cams):
+    """Una cámara grande arriba (ancho completo) y las demás en fila debajo."""
+    n = len(cams)
+    if n <= 1:
+        return auto_layout(cams)
+    m = n - 1
+    per = min(m, 4)
+    r = math.ceil(m / per)
+    rs = 2 + r
+    cells = [{"r": 0, "c": 0, "rs": rs, "cs": per, "cam": cams[0]["id"]}]
+    for j in range(m):
+        cells.append({"r": rs + j // per, "c": j % per, "rs": 1, "cs": 1, "cam": cams[j + 1]["id"]})
+    last = m - (r - 1) * per
+    if last < per:
+        cells[-1]["cs"] += per - last
+    return normalize({"rows": rs + r, "cols": per, "cells": cells}, cams)
+
+
+PRESETS = {"grid": auto_layout, "focus": focus_layout, "pano": pano_layout}
+
+
+def preset(mode, cams):
+    return (PRESETS.get(mode, auto_layout)(cams) or auto_layout(cams))
 
 
 def default_editor_layout(cams):
