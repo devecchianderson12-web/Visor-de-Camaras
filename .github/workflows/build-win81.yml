@@ -1,6 +1,10 @@
 name: Build The Watcher (Windows 8.1 + instalador)
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -91,6 +95,29 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          files: |
+            installer_out/TheWatcher-Setup-Win81.exe
+            TheWatcher-Win81-portable.zip
+
+      - name: Publicar en el release «latest» (cada subida a la rama principal)
+        if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Última versión (automática)
+          prerelease: true
+          make_latest: "false"
+          target_commitish: ${{ github.sha }}
+          body: |
+            Versión automática de la última subida al repositorio.
+
+            **Windows 8.1 / 10 / 11 (64 bits)**
+            - `TheWatcher-Setup-Win81.exe`: instalador
+            - `TheWatcher-Win81-portable.zip`: sin instalar
+
+            **Linux x86_64 (Debian 12+, Ubuntu 22.04+, antiX 23+)**
+            - `TheWatcher-Linux-amd64.deb`: `sudo apt install ./TheWatcher-Linux-amd64.deb`
+            - `TheWatcher-Linux-x86_64.tar.gz`: cualquier distribución (`./install.sh`)
           files: |
             installer_out/TheWatcher-Setup-Win81.exe
             TheWatcher-Win81-portable.zip
