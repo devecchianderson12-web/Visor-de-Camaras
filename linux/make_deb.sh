@@ -18,10 +18,12 @@ chmod -R u+rwX,go+rX,go-w "$STAGE/opt/thewatcher"          # archivos legibles p
 ln -s /opt/thewatcher/TheWatcher "$STAGE/usr/bin/thewatcher"
 install -m 644 "$HERE/deb/thewatcher.desktop" "$STAGE/usr/share/applications/thewatcher.desktop"
 install -m 644 "$HERE/deb/copyright" "$STAGE/usr/share/doc/thewatcher/copyright"
+BASE_ICON="$HERE/../assets/watcher.png"
+icon_for() { if [ -f "$ICONS/thewatcher-$1.png" ]; then echo "$ICONS/thewatcher-$1.png"; else echo "$BASE_ICON"; fi; }   # respaldo
 for s in 48 64 128 256; do
-    install -D -m 644 "$ICONS/thewatcher-$s.png" "$STAGE/usr/share/icons/hicolor/${s}x${s}/apps/thewatcher.png"
+    install -D -m 644 "$(icon_for "$s")" "$STAGE/usr/share/icons/hicolor/${s}x${s}/apps/thewatcher.png"
 done
-install -m 644 "$ICONS/thewatcher-48.png" "$STAGE/usr/share/pixmaps/thewatcher.png"   # menús antiguos (IceWM, JWM...)
+install -m 644 "$(icon_for 48)" "$STAGE/usr/share/pixmaps/thewatcher.png"   # menús antiguos (IceWM, JWM...)
 
 install -m 755 "$HERE/deb/postinst" "$STAGE/DEBIAN/postinst"
 install -m 755 "$HERE/deb/postrm" "$STAGE/DEBIAN/postrm"

@@ -4,6 +4,8 @@ Visor multicámara RTSP / ONVIF ultraligero para cámaras iCSee y compatibles. S
 (FFmpeg vía PyAV y Qt van dentro). Windows 8.1 / 10 / 11 (64 bits) y Linux (x86_64, glibc 2.35+: Debian 12+, Ubuntu 22.04+, antiX 23+).
 
 ## Descargas (Releases)
+En **Releases → «Última versión (automática)»** están siempre los archivos de la última subida (Windows y Linux).
+
 - **Windows:** `TheWatcher-Setup-Win81.exe` (instalador) o `TheWatcher-Win81-portable.zip`.
 - **Linux (Debian, Ubuntu, Mint, antiX 23+):** `thewatcher_X.Y.Z_amd64.deb` →
   `sudo apt install ./thewatcher_X.Y.Z_amd64.deb` (apt instala solo las librerías que falten).
@@ -23,7 +25,7 @@ Claves útiles: `fps_grid`, `fit_mode`, `perf_opacity`, `perf_interval`, `hwacce
 
 ## Compilar (GitHub Actions)
 - `build-win81.yml` → instalador + portable de Windows (PyQt5 + PyAV 12).
-- `build-linux.yml` → `.tar.gz` y `.deb` de Linux (PyQt5 + PyAV 14). El `.deb` se instala en un Debian 12 limpio
+- `linux.yml` → `.tar.gz` y `.deb` de Linux (PyQt5 + PyAV 14). El `.deb` se instala en un Debian 12 limpio
   para comprobar que no falta ninguna dependencia.
 Con un tag `vX.Y.Z` los archivos se adjuntan solos al Release. Ambos hacen un autodiagnóstico del programa
 compilado y se ponen en rojo si algo no abre.
