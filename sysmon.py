@@ -1,7 +1,10 @@
-"""Monitor de rendimiento del sistema SIN dependencias (ctypes en Windows; /proc en Linux solo para pruebas).
+"""Monitor de rendimiento del sistema SIN dependencias (ctypes en Windows; /proc y sysfs en Linux).
  - CPU y RAM: llamadas de microsegundos (GetSystemTimes / GlobalMemoryStatusEx).
- - GPU: contadores de Windows «GPU Engine» (todas las marcas, Windows 10 1709+) o NVML (NVIDIA, incluso en 8.1).
+ - GPU: Windows: contadores «GPU Engine» (todas las marcas, 10 1709+) o NVML (NVIDIA). Linux: NVML (NVIDIA) o
+   sysfs (AMD). Intel no expone un porcentaje estándar.
    Si no hay forma de medirla, la GPU se informa como None («n/d»)."""
+import ctypes
+import glob
 import os
 import re
 import sys
@@ -22,7 +25,6 @@ def _pct(last, cur):
 
 
 if IS_WIN:
-    import ctypes
     from ctypes import wintypes
 
     class _MEMORYSTATUSEX(ctypes.Structure):
@@ -42,9 +44,6 @@ if IS_WIN:
 
     class _PdhItem(ctypes.Structure):
         _fields_ = [("szName", ctypes.c_wchar_p), ("FmtValue", _PdhValue)]
-
-    class _NvmlUtil(ctypes.Structure):
-        _fields_ = [("gpu", ctypes.c_uint), ("memory", ctypes.c_uint)]
 
     class _WinCpuRam:
         def __init__(self):
@@ -128,45 +127,6 @@ if IS_WIN:
             except Exception:
                 pass
 
-    class _GpuNvml:
-        """NVIDIA (también en Windows 8.1) a través de nvml.dll, que instala el controlador."""
-
-        def __init__(self):
-            lib = None
-            pf = os.environ.get("ProgramFiles", r"C:\Program Files")
-            for name in ("nvml.dll", os.path.join(pf, "NVIDIA Corporation", "NVSMI", "nvml.dll")):
-                try:
-                    lib = ctypes.CDLL(name)
-                    break
-                except OSError:
-                    continue
-            if lib is None or lib.nvmlInit_v2() != 0:
-                raise OSError("sin NVML")
-            n = ctypes.c_uint(0)
-            lib.nvmlDeviceGetCount_v2(ctypes.byref(n))
-            self._h = []
-            for i in range(n.value):
-                h = ctypes.c_void_p()
-                if lib.nvmlDeviceGetHandleByIndex_v2(i, ctypes.byref(h)) == 0:
-                    self._h.append(h)
-            if not self._h:
-                raise OSError("NVML sin dispositivos")
-            self._lib = lib
-
-        def sample(self):
-            best = None
-            for h in self._h:
-                u = _NvmlUtil()
-                if self._lib.nvmlDeviceGetUtilizationRates(h, ctypes.byref(u)) == 0:
-                    best = max(best or 0, u.gpu)
-            return None if best is None else float(best)
-
-        def close(self):
-            try:
-                self._lib.nvmlShutdown()
-            except Exception:
-                pass
-
     class _WinBackend:
         def __init__(self):
             self._cr = _WinCpuRam()
@@ -193,12 +153,89 @@ if IS_WIN:
                 self._gpu.close()
 
 
-class _LinuxBackend:
-    """Solo para pruebas fuera de Windows."""
-    gpu_source = "no disponible"
+def _nvml_names():
+    if IS_WIN:
+        pf = os.environ.get("ProgramFiles", r"C:\Program Files")
+        return ("nvml.dll", os.path.join(pf, "NVIDIA Corporation", "NVSMI", "nvml.dll"))
+    return ("libnvidia-ml.so.1", "libnvidia-ml.so")
+
+
+class _NvmlUtil(ctypes.Structure):
+    _fields_ = [("gpu", ctypes.c_uint), ("memory", ctypes.c_uint)]
+
+
+class _GpuNvml:
+    """NVIDIA a través de la biblioteca NVML, que instala el controlador (Windows 8.1+ y Linux)."""
 
     def __init__(self):
-        self._last = None
+        lib = None
+        for name in _nvml_names():
+            try:
+                lib = ctypes.CDLL(name)
+                break
+            except OSError:
+                continue
+        if lib is None or lib.nvmlInit_v2() != 0:
+            raise OSError("sin NVML")
+        n = ctypes.c_uint(0)
+        lib.nvmlDeviceGetCount_v2(ctypes.byref(n))
+        self._h = []
+        for i in range(n.value):
+            h = ctypes.c_void_p()
+            if lib.nvmlDeviceGetHandleByIndex_v2(i, ctypes.byref(h)) == 0:
+                self._h.append(h)
+        if not self._h:
+            raise OSError("NVML sin dispositivos")
+        self._lib = lib
+
+    def sample(self):
+        best = None
+        for h in self._h:
+            u = _NvmlUtil()
+            if self._lib.nvmlDeviceGetUtilizationRates(h, ctypes.byref(u)) == 0:
+                best = max(best or 0, u.gpu)
+        return None if best is None else float(best)
+
+    def close(self):
+        try:
+            self._lib.nvmlShutdown()
+        except Exception:
+            pass
+
+
+class _GpuSysfs:
+    """AMD (amdgpu) en Linux: uso en /sys/class/drm/cardN/device/gpu_busy_percent."""
+
+    def __init__(self, root="/sys/class/drm"):
+        self._files = sorted(glob.glob(os.path.join(root, "card[0-9]*", "device", "gpu_busy_percent")))
+        if not self._files:
+            raise OSError("sin sysfs de GPU")
+
+    def sample(self):
+        best = None
+        for f in self._files:
+            try:
+                with open(f) as fh:
+                    v = float(fh.read().strip())
+            except (OSError, ValueError):
+                continue
+            best = v if best is None else max(best, v)
+        return best
+
+    def close(self):
+        pass
+
+
+class _LinuxBackend:
+    """Solo para pruebas fuera de Windows."""
+    def __init__(self):
+        self._last, self._gpu, self.gpu_source = None, None, "no disponible"
+        for cls, label in ((_GpuNvml, "NVIDIA NVML"), (_GpuSysfs, "AMD (sysfs)")):
+            try:
+                self._gpu, self.gpu_source = cls(), label
+                break
+            except Exception:
+                continue
 
     def cpu(self):
         with open("/proc/stat") as f:
@@ -216,10 +253,11 @@ class _LinuxBackend:
         return 100.0 * (1.0 - info["MemAvailable"] / info["MemTotal"])
 
     def gpu(self):
-        return None
+        return self._gpu.sample() if self._gpu else None
 
     def close(self):
-        pass
+        if self._gpu:
+            self._gpu.close()
 
 
 def _make_backend():
