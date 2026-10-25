@@ -1,6 +1,10 @@
 name: Build The Watcher (Linux + .deb)
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -138,3 +142,42 @@ jobs:
           files: |
             out/TheWatcher-Linux-x86_64.tar.gz
             out/thewatcher_*_amd64.deb
+
+  # Mantiene un release «latest» con los archivos de la última subida: todo en un solo lugar.
+  publish-latest:
+    if: github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: TheWatcher-Linux-*
+          merge-multiple: true
+          path: out
+
+      - name: Nombres fijos para el release
+        run: |
+          mv out/thewatcher_*_amd64.deb out/TheWatcher-Linux-amd64.deb
+          ls -lh out
+
+      - name: Publicar en el release «latest»
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Última versión (automática)
+          prerelease: true
+          make_latest: "false"
+          target_commitish: ${{ github.sha }}
+          body: |
+            Versión automática de la última subida al repositorio.
+
+            **Windows 8.1 / 10 / 11 (64 bits)**
+            - `TheWatcher-Setup-Win81.exe`: instalador
+            - `TheWatcher-Win81-portable.zip`: sin instalar
+
+            **Linux x86_64 (Debian 12+, Ubuntu 22.04+, antiX 23+)**
+            - `TheWatcher-Linux-amd64.deb`: `sudo apt install ./TheWatcher-Linux-amd64.deb`
+            - `TheWatcher-Linux-x86_64.tar.gz`: cualquier distribución (`./install.sh`)
+          files: |
+            out/TheWatcher-Linux-amd64.deb
+            out/TheWatcher-Linux-x86_64.tar.gz
