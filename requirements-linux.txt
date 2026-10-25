@@ -1,4 +1,3 @@
-# Linux x86_64. PyQt5 (Qt 5.15) para no depender de libxcb-cursor y funcionar en más distribuciones.
-av>=14.0.0
-numpy
-PyQt5>=5.15.9
+   av>=14.0.0,<15
+   numpy==1.26.4
+   PyQt5>=5.15.9,<5.16
