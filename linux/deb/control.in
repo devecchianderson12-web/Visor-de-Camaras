@@ -1,0 +1,14 @@
+Package: thewatcher
+Version: @VERSION@
+Section: video
+Priority: optional
+Architecture: amd64
+Installed-Size: @SIZE@
+Maintainer: The Watcher <thewatcher@users.noreply.github.com>
+Depends: libc6 (>= 2.35), libgl1, libegl1, libfontconfig1, libfreetype6, libdbus-1-3, libglib2.0-0 | libglib2.0-0t64, libx11-6, libx11-xcb1, libxcb1, libxext6, libxkbcommon0, libxkbcommon-x11-0, libxcb-xinerama0, libxcb-icccm4, libxcb-image0, libxcb-keysyms1, libxcb-randr0, libxcb-render0, libxcb-render-util0, libxcb-shape0, libxcb-shm0, libxcb-sync1, libxcb-xfixes0, libxcb-xkb1
+Recommends: fonts-dejavu-core | fonts-noto-core
+Description: Visor multicámara RTSP / ONVIF ultraligero
+ The Watcher muestra varias cámaras de seguridad (iCSee y otras con RTSP u
+ ONVIF) en una sola ventana usando muy poco procesador. Incluye FFmpeg y Qt
+ dentro del paquete, búsqueda ONVIF, escaneo de red, cuadrículas
+ personalizables y un monitor de rendimiento.

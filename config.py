@@ -9,7 +9,7 @@ DEFAULTS = {
         "rtsp://{ip}:{port}/user={user}&password={password}"
         "&channel={channel}&stream={stream}.sdp?real_stream"
     ),
-    "hwaccel": True,              # intenta decodificar por GPU; si falla, usa CPU
+    "hwaccel": sys.platform == "win32",   # decodificar por GPU (en Linux queda opt-in: pon true para probar)
     "fps_grid": 12,               # FPS mostrados en la cuadrícula (menos = menos CPU)
     "fps_zoom": 25,               # FPS al maximizar una cámara
     "auto_quality_on_zoom": True, # al maximizar usa "Convencional"
@@ -39,7 +39,10 @@ def data_dir() -> str:
         return here
     if os.path.exists(os.path.join(here, "portable.flag")) or os.path.exists(os.path.join(here, "config.json")):
         return here
-    root = os.environ.get("APPDATA")
+    if sys.platform == "win32":
+        root = os.environ.get("APPDATA")
+    else:                                              # Linux: ~/.config (o $XDG_CONFIG_HOME)
+        root = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
     if not root:
         return here
     path = os.path.join(root, "TheWatcher")

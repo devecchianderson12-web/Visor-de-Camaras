@@ -1,0 +1,5 @@
+The Watcher
+Programa propio. Incluye componentes de terceros con sus propias licencias:
+ - FFmpeg (LGPL/GPL) a través de PyAV
+ - Qt 5 (LGPL v3) a través de PyQt5 (GPL v3)
+ - Python (PSF License)

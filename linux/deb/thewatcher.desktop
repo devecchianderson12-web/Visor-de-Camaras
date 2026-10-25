@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=The Watcher
+GenericName=Visor de cámaras
+Comment=Visor multicámara RTSP / ONVIF ultraligero
+Exec=thewatcher
+Icon=thewatcher
+Terminal=false
+Categories=AudioVideo;Video;Network;
+Keywords=camara;camera;cctv;rtsp;onvif;vigilancia;
+StartupWMClass=TheWatcher

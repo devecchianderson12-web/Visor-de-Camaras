@@ -1,0 +1,13 @@
+The Watcher - Linux (x86_64, glibc 2.35 o superior: Ubuntu 22.04+, Debian 12+, Fedora 36+, Mint 21+)
+
+SIN INSTALAR:   ./TheWatcher
+INSTALAR:       ./install.sh      (crea la entrada «The Watcher» en el menú de aplicaciones)
+DESINSTALAR:    ./uninstall.sh
+DIAGNÓSTICO:    ./TheWatcher --diagnose
+
+Si no abre y dice que faltan librerías, instala (Debian/Ubuntu/Mint):
+  sudo apt install libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+                   libxcb-render-util0 libxcb-xkb1 libxkbcommon-x11-0 libxcb-cursor0
+
+La configuración se guarda en ~/.config/TheWatcher/config.json
+Para «Buscar ONVIF» el cortafuegos debe permitir las respuestas UDP (ufw: sudo ufw allow from 192.168.0.0/16 to any proto udp).
